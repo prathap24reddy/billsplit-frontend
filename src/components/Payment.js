@@ -1,50 +1,67 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React from 'react';
 
+export default function Payment({ friend, transactions, totalPayments }) {
+  const calculateDetailedPayments = () => {
+    const detailedPayments = {};
+    totalPayments.forEach(payment => {
+      if (payment.name !== friend) {
+        detailedPayments[payment.name] = { lent: 0, borrowed: 0 };
+      }
+    });
 
-export default function Payment({data, onPaymentSubmit }) {
-    const noOfFriends=data.length;
-    // console.log(data);
-    const [amount,setAmount]=useState(0);
-    function handleChange(event){
-        setAmount(event.target.value);
-    }
-    async function handleSubmit(event) {
-        event.preventDefault();
+    transactions.forEach(transaction => {
+      if (transaction.lender === friend) {
+        const totalBorrowed = transaction.borrowers.reduce((sum, b) => sum + b.amount, 0);
+        transaction.borrowers.forEach(borrower => {
+          const ratio = borrower.amount / totalBorrowed;
+          detailedPayments[borrower.name].borrowed += transaction.amount * ratio;
+        });
+      } else if (transaction.borrowers.some(b => b.name === friend)) {
+        const borrower = transaction.borrowers.find(b => b.name === friend);
+        const ratio = borrower.amount / transaction.amount;
+        detailedPayments[transaction.lender].lent += transaction.amount * ratio;
+      }
+    });
 
-        if (amount==0 || isNaN(Number(amount))) {
-            alert('Please enter a valid number');
-            return;
-        }
-        const perAmount = amount / noOfFriends;
-        console.log(perAmount);
+    return detailedPayments;
+  };
 
-        try {
-            for (const item of data) {
-                const newBorrow = Number(item.borrow) + perAmount;
-                await axios.patch(`http://localhost:4000/updateborrow/${item.id}`, {
-                    borrow: newBorrow
-                });
-                console.log(`Updated borrow for ${item.name}`);
-            }
-            // Call the function to refresh data after all updates are done
-            onPaymentSubmit();
-            // Reset the amount input
-            setAmount(0);
-        } catch (err) {
-            console.error("Error updating borrow amounts:", err);
-        }
-    }
+  const detailedPayments = calculateDetailedPayments();
 
   return (
-    <form onSubmit={handleSubmit}>
-        <p>Enter amount of a payment</p>
-        <input
-            type='number'
-            onChange={handleChange}
-            value={amount!=0?amount:""}
-            ></input>
-        <button type='submit'>Submit</button>
-    </form>
+    <div>
+      <h3>Detailed Payments for {friend}</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Friend</th>
+            <th>Lent</th>
+            <th>Borrowed</th>
+            <th>Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(detailedPayments).map(([name, amounts]) => {
+            const net = amounts.lent - amounts.borrowed;
+            let netText;
+            if (net > 0) {
+              netText = `Owed $${net.toFixed(2)}`;
+            } else if (net < 0) {
+              netText = `Owe $${Math.abs(net).toFixed(2)}`;
+            } else {
+              netText = 'Settled';
+            }
+            return (
+              <tr key={name}>
+                <td>{name}</td>
+                <td>${amounts.lent.toFixed(2)}</td>
+                <td>${amounts.borrowed.toFixed(2)}</td>
+                <td>{netText}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -1,36 +1,40 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState } from 'react';
+import axios from 'axios';
 
-function AddFriend({ onFriendAdded }) {
-    const [name, setName] = useState("");
+function AddFriend({ tripId, friends, onFriendAdded }) {
+    const [selectedFriendId, setSelectedFriendId] = useState('');
 
-    const handleSubmit = async (e) => {
+    const handleAddFriend = async (e) => {
         e.preventDefault();
+        if (!selectedFriendId) return;
+
         try {
-            await axios.post("http://localhost:4000/addFriend", { name });
-            setName("");
-            onFriendAdded();
-        } catch (err) {
-            console.error("Error adding friend:", err);
+            await axios.post('http://localhost:4000/trip_users', {
+                trip_id: tripId,
+                user_id: selectedFriendId
+            });
+            console.log('Friend added to trip');
+            setSelectedFriendId('');
+            onFriendAdded(); // Trigger the refresh in BillSplit
+        } catch (error) {
+            console.error('Error adding friend to trip:', error);
         }
     };
 
     return (
         <div>
-            <h1>Add Friend</h1>
-            <form onSubmit={handleSubmit}>
-                <label>
-                    <div>
-                        <input
-                            type="text"
-                            name="name"
-                            placeholder="Enter a Friend Name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                        />
-                    </div>
-                </label>
-                <input type="submit" value="Submit" />
+            <h3 style={{textAlign:'center'}}>Add Friend to Trip</h3>
+            <form onSubmit={handleAddFriend}>
+                <select
+                    value={selectedFriendId}
+                    onChange={(e) => setSelectedFriendId(e.target.value)}
+                >
+                    <option value="" >Select a friend</option>
+                    {friends.map((friend) => (
+                        <option key={friend.id} value={friend.id}>{friend.name}</option>
+                    ))}
+                </select>
+                <button type="submit" className='button add' style={{ margin:'20px'}}>+</button>
             </form>
         </div>
     );

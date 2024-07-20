@@ -1,86 +1,57 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
-function PaymentHistory({ friendList, onUpdate }) {
-    const [history, setHistory] = useState([]);
+function PaymentHistory({ transactions, onEditTransaction, onDeleteTransaction }) {
+    const [error, setError] = useState(null);
 
-    const fetchPaymentHistory = async () => {
-        try {
-            const response = await axios.get("http://localhost:4000/paymentHistory");
-            setHistory(response.data);
-        } catch (err) {
-            console.error("Error fetching payment history:", err);
-        }
-    };
-
-    const handleDeleteTransaction = async (id) => {
-        try {
-            const response=await axios.delete(`http://localhost:4000/deleteTransaction/${id}`);
-            console.log("Delete response:", response);
-            fetchPaymentHistory(); // Refresh the payment history
-            if (onUpdate) onUpdate(); // Call the update function to refresh other components
-        } catch (err) {
-            console.error("Error deleting transaction:", err);
-        }
-    };
-
-    useEffect(() => {
-        fetchPaymentHistory();
-    }, []);
-
-    const getFriendName = (id) => {
-        const friend = friendList.find(f => f.id === id);
-        return friend ? friend.name : 'Unknown';
-    };
-
-    const parseJSONSafely = (data) => {
-        try {
-            if (typeof data === 'string') {
-                return JSON.parse(data);
+    const handleDelete = async (transactionId) => {
+        if (window.confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
+            try {
+                await axios.delete(`http://localhost:4000/transaction/${transactionId}`);
+                onDeleteTransaction(transactionId);
+            } catch (error) {
+                console.error('Error deleting transaction:', error);
+                setError('Failed to delete transaction. Please try again.');
             }
-            return data || [];
-        } catch (error) {
-            console.error('Error parsing JSON:', error);
-            return [];
         }
     };
+
+    if (!transactions.length) return <div>No transactions found for this trip.</div>;
 
     return (
         <div>
-            <h2>Payment History</h2>
-            <table>
+            <h2 className='box' id='heading'>Payment History</h2>
+            {error && <div className="error">{error}</div>}
+            <table className='box table'>
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Lenders</th>
-                        <th>Borrowers</th>
-                        <th>Total Amount</th>
+                        <th>Amount</th>
                         <th>Note</th>
+                        <th>Details</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {history.map((entry) => (
-                        <tr key={entry.id}>
-                            <td>{new Date(entry.date).toLocaleString()}</td>
+                    {transactions.map(transaction => (
+                        <tr key={transaction.id}>
+                            <td>{new Date(transaction.date).toLocaleString()}</td>
+                            <td>₹{Number(transaction.amount).toFixed(2)}</td>
+                            <td>{transaction.note}</td>
                             <td>
-                                {parseJSONSafely(entry.lenders).map((lender, index) => (
-                                    <div key={index}>
-                                        {getFriendName(lender.id)}: ${parseFloat(lender.amount).toFixed(2)}
-                                    </div>
-                                ))}
+                                <ul>
+                                    {transaction.users.map(user => (
+                                        <li key={user.id}>
+                                            {user.name}: 
+                                            {user.lent > 0 ? ` Lent ₹${user.lent.toFixed(2)}` : ''}
+                                            {user.borrow > 0 ? ` Borrowed ₹${user.borrow.toFixed(2)}` : ''}
+                                        </li>
+                                    ))}
+                                </ul>
                             </td>
                             <td>
-                                {parseJSONSafely(entry.borrowers).map((borrower, index) => (
-                                    <div key={index}>
-                                        {getFriendName(borrower.id)}: ${parseFloat(borrower.amount).toFixed(2)}
-                                    </div>
-                                ))}
-                            </td>
-                            <td>${parseFloat(entry.amount).toFixed(2)}</td>
-                            <td>{entry.note}</td>
-                            <td>
-                                <button onClick={() => handleDeleteTransaction(entry.id)}>Delete</button>
+                                <button onClick={() => handleDelete(transaction.id)} className='button' style={{width:'100%'}}><p>Delete</p></button>
+                                <button onClick={() => onEditTransaction(transaction)} className='button' style={{width:'100%'}}><p>Edit</p></button>
                             </td>
                         </tr>
                     ))}
